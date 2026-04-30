@@ -599,6 +599,45 @@ def index():
 def options_routes(path):
     return jsonify({}), 200
 
+@app.post("/api/chatbot/jay")
+def jay_chat():
+    user_email = get_current_user()
+    if not user_email:
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    payload = request.get_json(silent=True) or {}
+    message = payload.get("message")
+    dashboard_context = payload.get("context") 
+    
+    if not message:
+        return jsonify({"error": "Message is required"}), 400
+        
+    system_prompt = f"""You are Jay, a helpful assistant specifically designed for the user's Interview Dashboard.
+Your knowledge is EXCLUSIVELY limited to the data provided below. 
+If asked about anything outside the dashboard, respond with a variant of: "I am Jay, your Dashboard assistant. I am unable to answer questions outside of your interview performance data. What would you like to know about your dashboard metrics?"
+
+USER DASHBOARD DATA:
+{json.dumps(dashboard_context, indent=2)}
+
+CAPABILITIES:
+- Perform calculations (average scores, session frequency).
+- Determine best/worst skills based on radar/area chart data.
+- Identify session lengths and timing (longest, shortest, recent).
+- Provide insights on progress over time.
+
+Keep responses concise and professional."""
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": message}
+    ]
+    
+    ai_response = _call_chat(messages, temperature=0.3)
+    if not ai_response:
+        return jsonify({"error": "Jay is temporarily unavailable."}), 503
+        
+    return jsonify({"response": ai_response}), 200
+
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', '*')
