@@ -1,3 +1,12 @@
+async function handleResponse(response) {
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const errorMessage = payload?.error || payload?.message || `${response.status} ${response.statusText}`
+    throw new Error(errorMessage)
+  }
+  return payload
+}
+
 export async function postJson(path, body) {
   const response = await fetch(path, {
     method: 'POST',
@@ -8,13 +17,7 @@ export async function postJson(path, body) {
     body: JSON.stringify(body),
   })
 
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    const errorMessage = payload?.error || payload?.message || `${response.status} ${response.statusText}`
-    throw new Error(errorMessage)
-  }
-
-  return payload
+  return handleResponse(response)
 }
 
 export async function postForm(path, formData) {
@@ -26,11 +29,5 @@ export async function postForm(path, formData) {
     body: formData,
   })
 
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    const errorMessage = payload?.error || payload?.message || `${response.status} ${response.statusText}`
-    throw new Error(errorMessage)
-  }
-
-  return payload
+  return handleResponse(response)
 }

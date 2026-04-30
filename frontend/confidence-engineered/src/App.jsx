@@ -3,9 +3,10 @@ import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
 
 import {
-  Alert, AppBar, Box, Button, Card, CardContent, Chip, CircularProgress, Container, CssBaseline,
+  Alert, AppBar, Box, Button, Card, CardContent, Chip, CircularProgress, Container,
   Divider, Grid, IconButton, InputAdornment, LinearProgress, Paper, Stack, TextField,
   ToggleButton, ToggleButtonGroup, Toolbar, Typography,
 } from '@mui/material'
@@ -28,7 +29,6 @@ const INITIAL_FORM = {
   topics: ['Teamwork', 'Leadership', 'Problem Solving'],
 }
 
-import Dashboard from './pages/Dashboard'
 
 function normalizeTopic(value) {
   return value.trim().replace(/\s+/g, ' ')
@@ -116,6 +116,7 @@ function InterviewPage() {
   const [isStarting, setIsStarting] = useState(false)
   const [isResponding, setIsResponding] = useState(false)
   const [isEnding, setIsEnding] = useState(false)
+  const [useDocs, setUseDocs] = useState(false)
 
   const mediaRecorderRef = useRef(null)
   const mediaStreamRef = useRef(null)
@@ -181,8 +182,24 @@ function InterviewPage() {
   }
 
   const validateSetup = () => {
-    if (!form.jobDescription.trim()) return 'Please add a job description before starting.'
-    if (!form.background.trim()) return 'Please add your professional background before starting.'
+    if (useDocs) {
+      const storedUserId = localStorage.getItem('authUserId');
+      let docs = [];
+      if (storedUserId) {
+        try { docs = JSON.parse(localStorage.getItem(`docs_${storedUserId}`) || '[]'); } catch (e) {}
+      }
+      const resume = docs.find(d => d.type === 'Resume');
+      const jobDesc = docs.find(d => d.type === 'Document');
+      if (!resume || !jobDesc) {
+        return 'Please upload both a Resume and Job Description in the Dashboard first.'
+      }
+      if (!resume.content || !jobDesc.content) {
+        return 'One or more documents have no text content. Please re-upload your files in the Dashboard to enable automatic reading.'
+      }
+    } else {
+      if (!form.jobDescription.trim()) return 'Please add a job description before starting.'
+      if (!form.background.trim()) return 'Please add your professional background before starting.'
+    }
     if (!form.topics.length) return 'Please select at least one interview topic.'
     return ''
   }
@@ -206,10 +223,20 @@ function InterviewPage() {
     setIsStarting(true)
 
     try {
+      const storedUserId = localStorage.getItem('authUserId');
+      let docs = [];
+      if (storedUserId) {
+        try { docs = JSON.parse(localStorage.getItem(`docs_${storedUserId}`) || '[]'); } catch (e) {}
+      }
+      const resumeDoc = docs.find(d => d.type === 'Resume');
+      const jobDescDoc = docs.find(d => d.type === 'Document');
+
       const payload = await startInterviewSession({
-        jobDescription: form.jobDescription,
-        background: form.background,
+        jobDescription: useDocs ? (jobDescDoc?.content || '') : form.jobDescription,
+        background: useDocs ? (resumeDoc?.content || '') : form.background,
         topics: form.topics,
+        hasResume: useDocs ? !!resumeDoc : false,
+        hasJobDesc: useDocs ? !!jobDescDoc : false,
         userId,
       })
 
@@ -470,23 +497,72 @@ function InterviewPage() {
               <Paper elevation={0} sx={{ p: { xs: 3, md: 4 }, border: '1px solid #d4e1ef' }}>
                 {view === 'setup' && (
                   <Stack spacing={2.5}>
-                    <Typography variant="h5">New Interview Setup</Typography>
-                    <TextField
-                      label="Job Description"
-                      value={form.jobDescription}
-                      onChange={updateForm('jobDescription')}
-                      multiline
-                      minRows={4}
-                      fullWidth
-                    />
-                    <TextField
-                      label="Your Background"
-                      value={form.background}
-                      onChange={updateForm('background')}
-                      multiline
-                      minRows={3}
-                      fullWidth
-                    />
+                    <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
+                      <Typography variant="h5">New Interview Setup</Typography>
+                      <ToggleButtonGroup
+                        color="primary"
+                        value={useDocs ? 'docs' : 'manual'}
+                        exclusive
+                        onChange={(e, val) => { if (val !== null) setUseDocs(val === 'docs'); }}
+                        size="small"
+                      >
+                        <ToggleButton value="manual">Manual Entry</ToggleButton>
+                        <ToggleButton value="docs">Read from Documents</ToggleButton>
+                      </ToggleButtonGroup>
+                    </Stack>
+                    
+                    {!useDocs ? (
+                      <>
+                        <TextField
+                          label="Job Description"
+                          value={form.jobDescription}
+                          onChange={updateForm('jobDescription')}
+                          multiline
+                          minRows={4}
+                          fullWidth
+                        />
+                        <TextField
+                          label="Your Background"
+                          value={form.background}
+                          onChange={updateForm('background')}
+                          multiline
+                          minRows={3}
+                          fullWidth
+                        />
+                      </>
+                    ) : (
+                      <Stack spacing={2}>
+                        <Alert severity="info">
+                          AI will use documents from your Dashboard. Make sure you have one marked as <strong>Resume</strong> and one as <strong>Document</strong> (Job Description).
+                        </Alert>
+                        {(() => {
+                          const storedUserId = localStorage.getItem('authUserId');
+                          let docs = [];
+                          if (storedUserId) {
+                            try { docs = JSON.parse(localStorage.getItem(`docs_${storedUserId}`) || '[]'); } catch (e) {}
+                          }
+                          const resume = docs.find(d => d.type === 'Resume');
+                          const jobDesc = docs.find(d => d.type === 'Document');
+                          
+                          return (
+                            <Stack spacing={1}>
+                              <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'action.hover' }}>
+                                <Typography variant="caption" color="text.secondary" display="block">Target Resume:</Typography>
+                                <Typography variant="body2" fontWeight="bold">
+                                  {resume ? `${resume.title} (${resume.content ? 'Content Ready' : 'No text content'})` : 'None found - Please upload in Dashboard'}
+                                </Typography>
+                              </Paper>
+                              <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'action.hover' }}>
+                                <Typography variant="caption" color="text.secondary" display="block">Target Job Description:</Typography>
+                                <Typography variant="body2" fontWeight="bold">
+                                  {jobDesc ? `${jobDesc.title} (${jobDesc.content ? 'Content Ready' : 'No text content'})` : 'None found - Please upload in Dashboard'}
+                                </Typography>
+                              </Paper>
+                            </Stack>
+                          );
+                        })()}
+                      </Stack>
+                    )}
 
                     <Box>
                       <Typography variant="subtitle2" sx={{ mb: 1 }}>
