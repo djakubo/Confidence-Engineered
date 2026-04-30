@@ -165,37 +165,34 @@ def _transcribe_audio(uploaded_file) -> Optional[str]:
                 pass
 
 
-def _build_system_prompt(job_description: str, background: str, topics: List[str]) -> str:
+def _build_system_prompt(job_description: str, background: str, topics: List[str], has_resume: bool = True, has_job_desc: bool = True) -> str:
     topic_text = ", ".join(topics) if topics else "general behavioral interview skills"
+    
+    rules = [
+        "BE A NATURAL INTERVIEWER: Maintain a professional, conversational, and realistic interview flow. Acknowledge the candidate's responses briefly before moving on. Your goal is to assess their fit while making the interaction feel like a real human dialogue."
+    ]
+    
+    if has_job_desc:
+        rules.append("STRATEGIC QUESTIONING: Internalize the Job Description. Use it to determine which skills and traits are most important for this specific role. Guide the interview toward these areas, but DO NOT explicitly mention that you are 'reading' a job description or referencing a provided document. Your knowledge of the role should feel inherent.")
+    
+    if has_resume:
+        rules.append("RESUME REFERENCING: Treat the Candidate Background as their formal Resume. Throughout the interview, specifically mention details, past companies, or projects found in this background to ask deep-dive questions (e.g., 'I see on your resume that you led a team at...'). This demonstrates that you have thoroughly reviewed their history.")
+    
+    rules_text = "CRITICAL OPERATING INSTRUCTIONS:\n" + "\n".join([f"- {r}" for r in rules]) + "\n\n"
+    
     return (
-        "You are a professional behavioral interviewer. "
-        "Run a realistic interview for the provided role and candidate background. "
-        "Ask one question at a time. Ask follow-up probing questions when needed. "
-        "If the user is stuck, offer a brief hint and continue. "
-        "Keep tone constructive and concise.\n\n"
-        f"Job Description:\n{job_description}\n\n"
-        f"Candidate Background:\n{background}\n\n"
-        f"Topics to cover: {topic_text}\n"
+        "You are a professional executive interviewer. "
+        "Run a realistic, high-stakes interview for the provided role and candidate background. "
+        "Ask one question at a time. Use follow-up probing questions to dig deeper into their STAR (Situation, Task, Action, Result) responses. "
+        "Keep tone constructive, sharp, and concise.\n\n"
+        f"{rules_text}"
+        f"JOB DESCRIPTION FOR YOUR REFERENCE:\n{job_description}\n\n"
+        f"CANDIDATE BACKGROUND / RESUME:\n{background}\n\n"
+        f"SPECIFIC TOPICS TO EXPLORE: {topic_text}\n"
     )
 
 
-def _mock_first_question(topics: List[str]) -> str:
-    if topics:
-        return f"To start, tell me about a time you demonstrated {topics[0]}."
-    return "To start, tell me about yourself and a recent challenge you handled at work."
 
-
-def _mock_next_question(session, user_text: str) -> str:
-    topics = json.loads(session.topics)
-    idx = session.current_topic_index
-    if not user_text or len(user_text.split()) < 15:
-        return "Can you add more specifics using the situation, action, and result?"
-
-    if idx + 1 < len(topics):
-        session.current_topic_index += 1
-        next_topic = topics[session.current_topic_index]
-        return f"Good context. Now walk me through a situation that shows {next_topic}."
-    return "Thanks. Before we wrap, what would you improve in one of your examples?"
 
 
 def _extract_feedback_json(raw_text: str) -> Optional[Dict[str, Any]]:
@@ -213,20 +210,7 @@ def _extract_feedback_json(raw_text: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _mock_feedback(session) -> Dict[str, Any]:
-    msgs = json.loads(session.messages)
-    user_answers = [m["content"] for m in msgs if m["role"] == "user"]
-    avg_len = 0 if not user_answers else sum(len(a.split()) for a in user_answers) / len(user_answers)
-    confidence_score = min(95, max(50, int(55 + avg_len * 0.8)))
-    base = min(90, max(45, int(50 + avg_len * 0.7)))
-    return {
-        "clarity": {"score": base, "comment": "Responses were generally understandable."},
-        "relevance": {"score": base + 2, "comment": "Most examples stayed on topic."},
-        "structure": {"score": base - 3, "comment": "Use clearer STAR framing in each answer."},
-        "confidence": {"score": confidence_score, "comment": "Tone was steady; add stronger ownership language."},
-        "depth": {"score": base - 1, "comment": "Add measurable outcomes to increase impact."},
-        "overall_coaching_note": "Prioritize concise STAR stories with specific metrics and decisions.",
-    }
+
 
 
 @app.post("/api/session/start")
@@ -235,16 +219,22 @@ def start_session():
     job_description = (payload.get("job_description") or "").strip()
     background = (payload.get("background") or "").strip()
     topics = payload.get("topics") or payload.get("behavioral_topics") or []
-    user_id = payload.get("user_id")
+    
+    user_email = get_current_user()
+    user = User.query.filter_by(email=user_email).first() if user_email else None
+    user_id = user.id if user else payload.get("user_id")
 
     if not isinstance(topics, list):
         return jsonify({"error": "topics must be a list of strings"}), 400
     topics = [str(t).strip() for t in topics if str(t).strip()]
 
+    has_resume = _parse_bool(payload.get("hasResume", True))
+    has_job_desc = _parse_bool(payload.get("hasJobDesc", True))
+
     if not job_description:
         return jsonify({"error": "job_description is required"}), 400
 
-    system_prompt = _build_system_prompt(job_description, background, topics)
+    system_prompt = _build_system_prompt(job_description, background, topics, has_resume, has_job_desc)
     session_id = str(uuid.uuid4())
 
     messages = [
@@ -254,7 +244,10 @@ def start_session():
             "content": "Begin the interview with the first behavioral question.",
         },
     ]
-    ai_message = _call_chat(messages, temperature=0.4) or _mock_first_question(topics)
+    ai_message = _call_chat(messages, temperature=0.4)
+    if not ai_message:
+        return jsonify({"error": "AI Interviewer is currently unavailable. Please try again later."}), 503
+        
     messages.append({"role": "assistant", "content": ai_message})
 
     session_row = InterviewSession(
@@ -275,15 +268,6 @@ def start_session():
         "session_id": session_id,
         "interviewer_message": ai_message,
     }
-    if _debug_enabled():
-        response["_debug"] = {
-            "mode": "openai" if _openai_client() else "mock",
-            "topic_count": len(topics),
-            "current_topic_index": 0,
-            "messages": messages,
-            "feedback": None,
-            "user_email": get_current_user()
-        }
     return jsonify(response), 200
 
 
@@ -315,7 +299,10 @@ def respond_session():
     
     session_row.messages = json.dumps(messages)
     
-    ai_message = _call_chat(messages, temperature=0.5) or _mock_next_question(session_row, user_text)
+    ai_message = _call_chat(messages, temperature=0.5)
+    if not ai_message:
+        return jsonify({"error": "AI Interviewer is currently unavailable. Please try again later."}), 503
+    
     messages.append({"role": "assistant", "content": ai_message})
 
     session_row.messages = json.dumps(messages)
@@ -369,7 +356,7 @@ def end_session():
     if raw_feedback:
         feedback_dict = _extract_feedback_json(raw_feedback)
     if not feedback_dict:
-        feedback_dict = _mock_feedback(session_row)
+        return jsonify({"error": "Failed to generate AI feedback. Please try again."}), 503
 
     session_row.status = "ended"
     session_row.ended_at = _utc_now()
@@ -388,12 +375,6 @@ def end_session():
     db.session.commit()
 
     response = {"session_id": session_id, "feedback": feedback_dict}
-    if _debug_enabled():
-        response["_debug"] = {
-            "mode": "openai" if raw_feedback else "mock",
-            "ended_at": session_row.ended_at,
-            "message_count": len(messages),
-        }
     return jsonify(response), 200
 
 
@@ -414,6 +395,31 @@ def debug_session(session_id: str):
             "feedback": json.loads(fb.raw_data) if fb else None
         }
     }), 200
+
+
+@app.post("/api/parse-document")
+def parse_document():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    file = request.files["file"]
+    if not file or not file.filename:
+        return jsonify({"error": "No file uploaded"}), 400
+    
+    filename = file.filename.lower()
+    try:
+        if filename.endswith(".pdf"):
+            import PyPDF2
+            reader = PyPDF2.PdfReader(file)
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text() + "\n"
+            return jsonify({"text": text.strip()}), 200
+        else:
+            text = file.read().decode("utf-8", errors="ignore")
+            return jsonify({"text": text.strip()}), 200
+    except Exception as e:
+        app.logger.error(f"Error parsing document: {e}")
+        return jsonify({"error": "Failed to parse document"}), 500
 
 
 @app.post("/api/register")
@@ -508,17 +514,31 @@ def google_auth():
     except ValueError as e:
         return jsonify({"message": "Invalid Google token"}), 401
 
-@app.get("/api/analytics/<int:user_id>")
-def analytics(user_id):
-    sessions = InterviewSession.query.filter_by(user_id=user_id, status="ended").all()
+@app.get("/api/analytics/me")
+def analytics():
+    user_email = get_current_user()
+    if not user_email:
+        return jsonify({"error": "Unauthorized"}), 401
+    user = User.query.filter_by(email=user_email).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+        
+    user_data = {
+        "name": user.name or user.email.split("@")[0].capitalize(),
+        "email": user.email,
+        "role": user.role or "Candidate",
+        "avatarId": user.avatar_id or "generic"
+    }
+
+    sessions = InterviewSession.query.filter_by(user_id=user.id, status="ended").all()
     if not sessions:
-        return jsonify({"message": "No sessions found for this user", "sessions": [], "averages": {}}), 200
+        return jsonify({"message": "No sessions found for this user", "sessions": [], "averages": {}, "user": user_data}), 200
         
     session_ids = [s.id for s in sessions]
     feedbacks = Feedback.query.filter(Feedback.session_id.in_(session_ids)).all()
     
     if not feedbacks:
-        return jsonify({"message": "No feedback found", "sessions": [], "averages": {}}), 200
+        return jsonify({"message": "No feedback found", "sessions": [], "averages": {}, "user": user_data}), 200
         
     avg_clarity = sum(f.clarity_score for f in feedbacks) / len(feedbacks)
     avg_relevance = sum(f.relevance_score for f in feedbacks) / len(feedbacks)
@@ -536,14 +556,8 @@ def analytics(user_id):
             "feedback": json.loads(fb.raw_data) if fb else None
         })
         
-    user = User.query.get(user_id)
     return jsonify({
-        "user": {
-            "name": user.name or user.email.split("@")[0].capitalize(),
-            "email": user.email,
-            "role": user.role or "Candidate",
-            "avatarId": user.avatar_id or "generic"
-        },
+        "user": user_data,
         "averages": {
             "clarity": avg_clarity,
             "relevance": avg_relevance,
@@ -584,6 +598,45 @@ def index():
 @app.route('/<path:path>', methods=['OPTIONS'])
 def options_routes(path):
     return jsonify({}), 200
+
+@app.post("/api/chatbot/jay")
+def jay_chat():
+    user_email = get_current_user()
+    if not user_email:
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    payload = request.get_json(silent=True) or {}
+    message = payload.get("message")
+    dashboard_context = payload.get("context") 
+    
+    if not message:
+        return jsonify({"error": "Message is required"}), 400
+        
+    system_prompt = f"""You are Jay, a helpful assistant specifically designed for the user's Interview Dashboard.
+Your knowledge is EXCLUSIVELY limited to the data provided below. 
+If asked about anything outside the dashboard, respond with a variant of: "I am Jay, your Dashboard assistant. I am unable to answer questions outside of your interview performance data. What would you like to know about your dashboard metrics?"
+
+USER DASHBOARD DATA:
+{json.dumps(dashboard_context, indent=2)}
+
+CAPABILITIES:
+- Perform calculations (average scores, session frequency).
+- Determine best/worst skills based on radar/area chart data.
+- Identify session lengths and timing (longest, shortest, recent).
+- Provide insights on progress over time.
+
+Keep responses concise and professional."""
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": message}
+    ]
+    
+    ai_response = _call_chat(messages, temperature=0.3)
+    if not ai_response:
+        return jsonify({"error": "Jay is temporarily unavailable."}), 503
+        
+    return jsonify({"response": ai_response}), 200
 
 @app.after_request
 def after_request(response):
