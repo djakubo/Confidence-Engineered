@@ -189,9 +189,9 @@ function InterviewPage() {
         try { docs = JSON.parse(localStorage.getItem(`docs_${storedUserId}`) || '[]'); } catch (e) {}
       }
       const resume = docs.find(d => d.type === 'Resume');
-      const jobDesc = docs.find(d => d.type === 'Document');
+      const jobDesc = docs.find(d => d.type === 'Job Requirements');
       if (!resume || !jobDesc) {
-        return 'Please upload both a Resume and Job Description in the Dashboard first.'
+        return 'Please upload both a Resume and Job Requirements in the Dashboard first.'
       }
       if (!resume.content || !jobDesc.content) {
         return 'One or more documents have no text content. Please re-upload your files in the Dashboard to enable automatic reading.'
@@ -229,7 +229,7 @@ function InterviewPage() {
         try { docs = JSON.parse(localStorage.getItem(`docs_${storedUserId}`) || '[]'); } catch (e) {}
       }
       const resumeDoc = docs.find(d => d.type === 'Resume');
-      const jobDescDoc = docs.find(d => d.type === 'Document');
+      const jobDescDoc = docs.find(d => d.type === 'Job Requirements');
 
       const payload = await startInterviewSession({
         jobDescription: useDocs ? (jobDescDoc?.content || '') : form.jobDescription,
@@ -533,7 +533,7 @@ function InterviewPage() {
                     ) : (
                       <Stack spacing={2}>
                         <Alert severity="info">
-                          AI will use documents from your Dashboard. Make sure you have one marked as <strong>Resume</strong> and one as <strong>Document</strong> (Job Description).
+                          AI will use documents from your Dashboard. Make sure you have one marked as <strong>Resume</strong> and one as <strong>Job Requirements</strong>.
                         </Alert>
                         {(() => {
                           const storedUserId = localStorage.getItem('authUserId');
@@ -542,7 +542,7 @@ function InterviewPage() {
                             try { docs = JSON.parse(localStorage.getItem(`docs_${storedUserId}`) || '[]'); } catch (e) {}
                           }
                           const resume = docs.find(d => d.type === 'Resume');
-                          const jobDesc = docs.find(d => d.type === 'Document');
+                          const jobDesc = docs.find(d => d.type === 'Job Requirements');
                           
                           return (
                             <Stack spacing={1}>
@@ -553,7 +553,7 @@ function InterviewPage() {
                                 </Typography>
                               </Paper>
                               <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'action.hover' }}>
-                                <Typography variant="caption" color="text.secondary" display="block">Target Job Description:</Typography>
+                                <Typography variant="caption" color="text.secondary" display="block">Target Job Requirements:</Typography>
                                 <Typography variant="body2" fontWeight="bold">
                                   {jobDesc ? `${jobDesc.title} (${jobDesc.content ? 'Content Ready' : 'No text content'})` : 'None found - Please upload in Dashboard'}
                                 </Typography>
