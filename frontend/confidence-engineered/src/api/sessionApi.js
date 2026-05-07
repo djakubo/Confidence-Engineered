@@ -1,11 +1,13 @@
 import { postForm, postJson } from './client'
 
-export const startInterviewSession = ({ jobDescription, background, topics, userId }) => {
+export const startInterviewSession = ({ jobDescription, background, topics, userId, hasResume, hasJobDesc }) => {
   return postJson('/api/session/start', {
     job_description: jobDescription,
     background,
     topics,
     user_id: userId,
+    hasResume,
+    hasJobDesc
   })
 }
 

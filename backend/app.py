@@ -43,6 +43,9 @@ class User(db.Model):
     role = db.Column(db.String(120), nullable=True)
     avatar_id = db.Column(db.String(50), default="generic")
 
+    def __init__(self, **kwargs):
+        super(User, self).__init__(**kwargs)
+
 class InterviewSession(db.Model):
     __tablename__ = 'interview_session'
     id = db.Column(db.String(120), primary_key=True)
@@ -56,6 +59,9 @@ class InterviewSession(db.Model):
     current_topic_index = db.Column(db.Integer, default=0)
     messages = db.Column(db.Text)
 
+    def __init__(self, **kwargs):
+        super(InterviewSession, self).__init__(**kwargs)
+
 class Feedback(db.Model):
     __tablename__ = 'feedback'
     id = db.Column(db.Integer, primary_key=True)
@@ -67,6 +73,9 @@ class Feedback(db.Model):
     depth_score = db.Column(db.Integer)
     overall_note = db.Column(db.Text)
     raw_data = db.Column(db.Text)
+
+    def __init__(self, **kwargs):
+        super(Feedback, self).__init__(**kwargs)
 
 with app.app_context():
     db.create_all()
