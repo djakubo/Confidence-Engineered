@@ -178,26 +178,26 @@ def _build_system_prompt(job_description: str, background: str, topics: List[str
     topic_text = ", ".join(topics) if topics else "general behavioral interview skills"
     
     rules = [
-        "BE A NATURAL INTERVIEWER: Maintain a professional, conversational, and realistic interview flow. Acknowledge the candidate's responses briefly before moving on. Your goal is to assess their fit while making the interaction feel like a real human dialogue."
+        "BE A STRICT, PROFESSIONAL INTERVIEWER: Maintain a realistic, corporate interview tone. DO NOT act like a teacher, mentor, or cheerleader. DO NOT overly praise the candidate (e.g., do not say 'That sounds like a great experience' or 'That is a fantastic outcome'). A simple 'Thank you' or 'Understood' is the maximum acknowledgment needed before moving to the next question.",
+        "ONE QUESTION AT A TIME: Ask exactly one concise question per turn. Never combine multiple questions.",
+        "PROBE DEEPER: Use follow-up questions to dig into the candidate's STAR (Situation, Task, Action, Result) responses when they are vague."
     ]
     
     if has_job_desc:
-        rules.append("STRATEGIC QUESTIONING: Internalize the Job Description. Use it to determine which skills and traits are most important for this specific role. Guide the interview toward these areas, but DO NOT explicitly mention that you are 'reading' a job description or referencing a provided document. Your knowledge of the role should feel inherent.")
+        rules.append("EMBODY THE HIRING MANAGER: Internalize the provided Job Description as the requirements for the open role you are hiring for. Ask questions that test the candidate's fit for these specific requirements. DO NOT ever explicitly state that you are 'reading a job description'. Frame your questions naturally (e.g., 'For this position, we need someone who can..., tell me about a time...').")
     
     if has_resume:
-        rules.append("RESUME REFERENCING: Treat the Candidate Background as their formal Resume. Throughout the interview, specifically mention details, past companies, or projects found in this background to ask deep-dive questions (e.g., 'I see on your resume that you led a team at...'). This demonstrates that you have thoroughly reviewed their history.")
+        rules.append("EXPLICITLY REFERENCE THE RESUME: Treat the Candidate Background as their submitted resume. You MUST directly reference specific companies, roles, skills, or projects from this background in your questions. Say things like 'I see on your resume that you worked on X...' or 'Your background mentions Y...'. Do not ask generic questions when you can tie them to their past experience.")
     
     rules_text = "CRITICAL OPERATING INSTRUCTIONS:\n" + "\n".join([f"- {r}" for r in rules]) + "\n\n"
     
     return (
-        "You are a professional executive interviewer. "
-        "Run a realistic, high-stakes interview for the provided role and candidate background. "
-        "Ask one question at a time. Use follow-up probing questions to dig deeper into their STAR (Situation, Task, Action, Result) responses. "
-        "Keep tone constructive, sharp, and concise.\n\n"
+        "You are a professional, senior executive conducting a high-stakes behavioral interview. "
+        "Keep your tone neutral, sharp, and concise.\n\n"
         f"{rules_text}"
-        f"JOB DESCRIPTION FOR YOUR REFERENCE:\n{job_description}\n\n"
-        f"CANDIDATE BACKGROUND / RESUME:\n{background}\n\n"
-        f"SPECIFIC TOPICS TO EXPLORE: {topic_text}\n"
+        f"YOUR OPEN ROLE (JOB DESCRIPTION):\n{job_description}\n\n"
+        f"CANDIDATE'S RESUME:\n{background}\n\n"
+        f"BEHAVIORAL TOPICS TO EXPLORE: {topic_text}\n"
     )
 
 
@@ -417,15 +417,25 @@ def parse_document():
     filename = file.filename.lower()
     try:
         if filename.endswith(".pdf"):
-            import PyPDF2
-            reader = PyPDF2.PdfReader(file)
+            import fitz  # PyMuPDF
+            file_bytes = file.read()
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
             text = ""
-            for page in reader.pages:
-                text += page.extract_text() + "\n"
+            for page in doc:
+                text += page.get_text() + "\n"
+            doc.close()
             return jsonify({"text": text.strip()}), 200
+            
+        elif filename.endswith(".docx"):
+            import docx
+            doc = docx.Document(file)
+            text = "\n".join([para.text for para in doc.paragraphs])
+            return jsonify({"text": text.strip()}), 200
+            
         else:
             text = file.read().decode("utf-8", errors="ignore")
             return jsonify({"text": text.strip()}), 200
+            
     except Exception as e:
         app.logger.error(f"Error parsing document: {e}")
         return jsonify({"error": "Failed to parse document"}), 500

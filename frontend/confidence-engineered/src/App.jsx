@@ -235,8 +235,8 @@ function InterviewPage() {
         jobDescription: useDocs ? (jobDescDoc?.content || '') : form.jobDescription,
         background: useDocs ? (resumeDoc?.content || '') : form.background,
         topics: form.topics,
-        hasResume: useDocs ? !!resumeDoc : false,
-        hasJobDesc: useDocs ? !!jobDescDoc : false,
+        hasResume: useDocs ? !!resumeDoc : !!form.background.trim(),
+        hasJobDesc: useDocs ? !!jobDescDoc : !!form.jobDescription.trim(),
         userId,
       })
 
