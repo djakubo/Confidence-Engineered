@@ -1,0 +1,339 @@
+Confidence, Engineered
+
+AI-Powered Mock Interview Training Platform
+
+System Design Document | v1.0
+
+1. Overview
+
+The primary goal of Confidence, Engineered is to build a full‑stack,
+cloud‑deployed web application that delivers realistic, AI‑powered
+behavioral mock interviews through a browser. The system uses the
+technologies introduced throughout the course: a Flask backend written
+in Python, a React frontend, and a MySQL database hosted on AWS RDS. It
+must support secure user authentication, persistent session storage, and
+a smooth browser‑based experience with no installation required. A key
+objective is integrating an AI chatbot into the React interface and
+connecting it to a Flask endpoint that uses a LlamaIndex agent with
+custom tools—including a multiply tool and an external API
+tool—demonstrating the ability to call APIs from Python and expose them
+through the chatbot. The project also applies the Linux, Git, and cloud
+deployment skills covered in class, including managing an EC2 instance,
+configuring security groups and SSH access, running the application in a
+virtual environment, and using S3, Lambda, and CloudWatch for
+event‑driven processing and monitoring. Overall, the goal is to create a
+simple but complete end‑to‑end system that reflects real‑world
+architecture while remaining achievable within a semester.
+
+2. Goals
+
+2.1 Primary Goals
+
+-   Enable users to conduct realistic, voice-driven behavioral mock
+      interviews tailored to a specific job description and selected
+      topic areas.
+
+-   Provide per-session feedback and long-term analytics on interview
+      performance across skill areas such as clarity, confidence,
+      relevance, and structure.
+
+-   Make the system accessible via a browser with no installation
+      required.
+
+-   Keep the architecture simple enough for a small team to implement
+      within a semester-length timeline.
+
+3. High-Level Architecture
+
+3.1 System Diagram
+
+The system consists of four logical layers: the React frontend (client),
+the Flask backend (server), the OpenAI API suite (AI layer), and a
+relational database (storage). The diagram below describes data flow at
+a high level:
+
+[ Browser: React App ]
+
+| REST API calls (JSON + audio blobs) |
+
+v ^
+
+[ Flask Backend ]
+
+| | |
+
+v v v
+
+[ GPT-4o / GPT-4o-mini ] [ Whisper ] [ SQLite/PostgreSQL ]
+
+(questions/conversation) (STT) (users, sessions, analytics)
+
+3.2 Component Summary
+
+  ------------------------------------------------------------------------------
+  Layer     Component        Technology           Responsibility
+  --------- ---------------- -------------------- ------------------------------
+  Client    Web Browser      React.js             UI rendering, audio capture,
+                                                  session display
+
+  Backend   Web Server       Python / Flask       REST API, session management,
+                                                  prompt engineering
+
+  AI Layer  LLM Integration  OpenAI GPT-4o        Behavioral interview question
+                                                  generation, natural
+                                                  conversation management,
+                                                  feedback analysis
+
+  AI Layer  Speech-to-Text   OpenAI Whisper API   Transcribes user's audio
+                                                  responses
+
+  Storage   Database         SQLite (dev) /       User accounts, session
+                             PostgreSQL (prod)    history, analytics data
+  ------------------------------------------------------------------------------
+
+3.3 Key Design Decisions at a Glance
+
+-   No custom speech recognition model — OpenAI Whisper API handles STT
+      with high accuracy out of the box.
+
+-   No custom TTS model — the AI interviewer responds in text, avoiding
+      TTS latency and making complex questions easier to read and
+      reference during the interview.
+
+-   No fixed turn count — the AI is instructed to cover a set of
+      behavioral topic areas (e.g. teamwork, conflict resolution,
+      leadership) and manages pacing naturally via prompt engineering,
+      asking follow-up or probing questions when needed rather than
+      moving on after a fixed number of exchanges.
+
+-   All AI context (job description, conversation history) is stored
+      server-side in Flask's session and passed to GPT-4o on each turn.
+
+4. Detailed Interactions
+
+4.1 Critical User Journeys
+
+CUJ 1: User Registration
+
+The user navigates to the homepage and clicks "Get Started." They are
+taken to a registration page with fields for their name, email, and
+password. Upon submitting the form, the frontend sends a POST request to
+/api/register. Flask validates the inputs, hashes the password using
+bcrypt, and stores the new user record in the database. The user is
+redirected to the dashboard with a welcome message and a prompt to start
+their first interview.
+
+CUJ 2: Starting an Interview Session (Primary Chatbot CUJ)
+
+This is the core experience and the CUJ exposed via the chatbot. The
+user arrives at the "New Interview" page and pastes a job description
+into the text area. They also enter a brief background summary together
+with their resume, and select which behavioral topic areas they want the
+interview to cover (e.g. teamwork, leadership, conflict resolution,
+problem-solving). They click "Start Interview."
+
+The frontend sends a POST to /api/session/start with the job
+description, background, and selected behavioral topics. Flask
+constructs a system prompt for GPT-4o-mini that instructs it to act as a
+professional behavioral interviewer for that specific role, using the
+candidate’s background to personalize questions, covering the selected
+topic areas, and responding naturally — with follow-ups, hints, or
+probing questions — rather than mechanically advancing through a fixed
+question list. GPT-4o-mini returns the first question as text. Flask
+returns this text to the frontend, which displays it on screen. The
+interview has begun.
+
+CUJ 3: The Voice Interview Loop
+
+After the AI displays its first question as text, the frontend displays
+a "Hold to Answer" microphone button. The user presses and holds the
+button to record their spoken response. When they release, the audio
+blob is sent via POST to /api/session/respond. Flask forwards the audio
+to OpenAI’s Whisper API for transcription. The transcript is appended to
+the conversation history in Flask’s session store. Flask calls
+GPT-4o-mini with the full conversation history to generate the next
+response. Rather than simply advancing to the next question, the AI is
+instructed to behave like a real interviewer: if the answer was strong,
+it briefly acknowledges it and moves to the next topic; if the answer
+was vague or incomplete, it asks a follow-up or probing question; if the
+user seems stuck, it offers a gentle hint or reframing. The AI’s
+response is returned as text and displayed on screen. This loop
+continues until all selected behavioral topics have been covered.
+
+CUJ 4: End of Session and Feedback
+
+After the final exchange, the frontend sends a POST to /api/session/end.
+Flask sends the full transcript to GPT-4o-mini with a feedback prompt
+instructing it to score the candidate across five dimensions: Clarity
+(how clearly did the user communicate?), Relevance (did answers address
+the questions?), Structure (did answers follow a logical format like
+STAR?), Confidence (did language reflect self-assurance?), and Depth
+(how substantively did the user answer?). GPT-4o-mini returns a JSON
+object with scores (0-100) and qualitative comments for each dimension.
+Flask saves this to the database under the user’s session record. The
+frontend displays a feedback summary card with scores and a short
+AI-generated coaching note.
+
+CUJ 5: Analytics Dashboard
+
+The user navigates to their Analytics page. The frontend calls GET
+/api/analytics/:userId. Flask queries the database for all of the user's
+past sessions, aggregates dimension scores over time, and returns the
+data as JSON. The frontend renders progress charts for each skill
+dimension (e.g., a line chart showing Clarity score across 10 sessions),
+a summary card showing strongest and weakest areas, and a session log
+with individual session details. This gives users a data-driven view of
+their improvement trajectory.
+
+4.2 Sequence Diagram — Voice Interview Loop
+
+User Frontend Flask Whisper GPT-4o-mini DB
+
+| | | | | |
+
+|-- speaks --> | | | | |
+
+| |-- audio --> | | | |
+
+| | |-- audio --> | | |
+
+| | |<-- text -- | | |
+
+| | |-- history + transcript --> | |
+
+| | |<----------- question ------ | |
+
+| |<-- text --- | | | |
+
+|<-- displays- | | | | |
+
+(loop repeats until all topics covered)
+
+(loop repeats until all behavioral topics are covered)
+
+4.3 API Endpoints Summary
+
+  -----------------------------------------------------------------------------
+  Endpoint                 Method   Description
+  ------------------------ -------- -------------------------------------------
+  /api/register            POST     Create a new user account. Accepts name,
+                                    email, password. Returns JWT token.
+
+  /api/login               POST     Authenticate user. Returns JWT token and
+                                    user profile.
+
+  /api/session/start       POST     Start a new interview session. Accepts job
+                                    description, background, and selected
+                                    behavioral topics. Returns first AI
+                                    question as text.
+
+  /api/session/respond     POST     Submit a user's audio response. Transcribes
+                                    via Whisper, generates next question or
+                                    follow-up via GPT-4o-mini, returns AI
+                                    response as text.
+
+  /api/session/end         POST     End session, trigger GPT-4o feedback
+                                    scoring. Saves results to DB. Returns full
+                                    feedback JSON.
+
+  /api/analytics/:userId   GET      Retrieve all sessions and aggregated skill
+                                    scores for a user.
+  -----------------------------------------------------------------------------
+
+5. Decisions and Tradeoffs
+
+5. Decisions and Tradeoffs (Updated According to Course Skills)
+
+  ------------------------------------------------------------------------
+  Decision       Rationale (Based on Class       Tradeoffs / Risks
+                 Tutorials)                      
+  -------------- ------------------------------- -------------------------
+  Flask (Python) Matches the course requirement  Less scalable than Node
+  for Backend    to build a Python backend using or FastAPI; requires
+                 Flask, virtual environments,    manual setup of
+                 and SQLAlchemy. Easy            virtualenv, WSGI, and
+                 integration with LlamaIndex and dependency management.
+                 external APIs.                  
+
+  React for      Required by the class; aligns   More complex build
+  Frontend       with the freeCodeCamp chatbot   pipeline; requires Node,
+                 tutorial. Provides              npm, and bundling.
+                 component‑based UI and easy     
+                 integration with browser APIs   
+                 (audio, forms).                 
+
+  MySQL on AWS   Required by Class 4. Supports   More expensive and
+  RDS            persistent cloud storage,       complex than SQLite;
+                 multi‑AZ availability, and      requires security group
+                 integration with EC2. Replaces  configuration, inbound
+                 SQLite used in early            rules, and environment
+                 development.                    variable management.
+
+  EC2 for        Matches class requirement to    Must manage security
+  Hosting Flask  deploy backend to EC2 and       groups, SSH keys,
+  App            connect it to RDS. Provides     virtualenv, and uptime
+                 full control over Linux         manually.
+                 environment.                    
+
+  S3 + Lambda    Based on the serverless         Requires IAM roles,
+  for            workshop. Allows automatic      triggers, and CloudWatch
+  Event‑Driven   processing of uploads and       monitoring; risk of
+  Tasks          demonstrates event‑driven       unexpected costs if not
+                 architecture.                   cleaned up.
+
+  LlamaIndex     Required by Class 6. Allows the More complex prompt
+  Agent with     chatbot to call Python          engineering; debugging
+  Tools          functions (multiply tool,       tool calls can be tricky;
+                 external API tool).             requires careful state
+                 Demonstrates tool‑calling       management.
+                 architecture.                   
+
+  OpenAI         Whisper handles STT;            API costs, rate limits,
+  Whisper +      GPT‑4o-mini reduces cost during and dependency on
+  GPT‑4o-mini    development. Matches class      external uptime.
+                 emphasis on using AI APIs.      
+
+  GitHub for     Required by Class 2. Enables    Must avoid committing
+  Version        collaboration, pull requests,   secrets (DB passwords,
+  Control        and deployment workflows.       API keys).
+
+  Cursor +       Required by Class 1.            Risk of generating code
+  AI‑Assisted    Accelerates development and     you don’t fully
+  Coding         helps scaffold the project      understand; requires
+                 quickly.                        careful review and
+                                                 debugging.
+
+  Linux Terminal Required by Class 2. Necessary  Steeper learning curve;
+  for Deployment for EC2 setup, file management, mistakes in commands can
+                 and running Flask in            break deployment.
+                 production.                     
+  ------------------------------------------------------------------------
+
+6. Milestones 
+
+  -------------------------------------------------------------------------
+  M#   Timeline   Deliverable
+  ---- ---------- ---------------------------------------------------------
+  1    Week 1-2   Project scaffolding: React app + Flask API skeleton,
+                  basic routing, user registration/login
+
+  2    Week 3-4   Core interview flow: behavioral topic selection, job
+                  description input, prompt engineering for natural
+                  back-and-forth conversation, GPT-4o-mini question
+                  generation
+
+  3    Week 5-6   Audio pipeline: Whisper STT for user responses, text
+                  display for AI interviewer output; behavioral topic
+                  selection UI
+
+  4    Week 7-8   Analytics dashboard: per-session scoring, skill area
+                  breakdowns, historical progress charts
+
+  5    Week 9-10  Polish & testing: end-to-end user testing, error
+                  handling, latency optimization
+
+  6    Week 11-12 Final demo & deployment: hosted on Render/Railway,
+                  documentation complete
+  -------------------------------------------------------------------------
+
+Confidence, Engineered | System Design Document | v1.0
