@@ -83,7 +83,7 @@ export default function Dashboard() {
               id: s.session_id,
               date: s.created_at.substring(0, 10),
               score: overall,
-              duration: "10 mins",
+              duration: s.duration || "N/A",
               job: (s.job_description || "").substring(0, 30) + '...'
             };
           }).reverse();

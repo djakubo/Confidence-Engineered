@@ -354,9 +354,15 @@ def end_session():
 
     messages = json.loads(session_row.messages)
     feedback_prompt = (
-        "Score the candidate from 0-100 on clarity, relevance, structure, confidence, and depth. "
+        "Act as a hyper-critical executive interviewer. Evaluate the candidate's performance with extreme rigor. "
+        "Be stingy with high scores. A score above 90 should be nearly impossible and reserved for flawless, world-class responses. "
+        "Score from 0-100 on: clarity, relevance, structure, confidence, and depth. "
+        "CRITERIA:\n"
+        "- Penalize heavily (30-50 points) for vague answers, lack of specific metrics, or failing the STAR method.\n"
+        "- A 'good' answer should score 60-70. An 'excellent' answer scores 75-85. 90+ is for perfection.\n"
+        "- Use the full 0-100 scale. If an answer is poor, do not hesitate to give a 20 or 30.\n\n"
         "Return strict JSON with keys: clarity, relevance, structure, confidence, depth, overall_coaching_note. "
-        "Each dimension key must map to an object with score and comment."
+        "Each dimension key must map to an object: { 'score': int, 'comment': 'critical feedback' }."
     )
     feedback_messages = list(messages) + [{"role": "user", "content": feedback_prompt}]
     raw_feedback = _call_chat(feedback_messages, temperature=0.2)
@@ -568,10 +574,27 @@ def analytics():
     past_sessions = []
     for s in sessions:
         fb = next((f for f in feedbacks if f.session_id == s.id), None)
+        
+        duration_str = "N/A"
+        if s.created_at and s.ended_at:
+            try:
+                start = datetime.fromisoformat(s.created_at)
+                end = datetime.fromisoformat(s.ended_at)
+                diff = end - start
+                total_seconds = int(diff.total_seconds())
+                if total_seconds < 60:
+                    duration_str = f"{total_seconds}s"
+                else:
+                    duration_str = f"{total_seconds // 60}m {total_seconds % 60}s"
+            except Exception:
+                pass
+
         past_sessions.append({
             "session_id": s.id,
             "job_description": s.job_description,
             "created_at": s.created_at,
+            "ended_at": s.ended_at,
+            "duration": duration_str,
             "feedback": json.loads(fb.raw_data) if fb else None
         })
         
