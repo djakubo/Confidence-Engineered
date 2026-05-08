@@ -24,9 +24,9 @@ import {
 const MAX_RECORD_SECONDS = 120
 const SUGGESTED_TOPICS = ['Teamwork', 'Leadership', 'Conflict Resolution', 'Problem Solving', 'Communication', 'Ownership']
 const INITIAL_FORM = {
-  jobDescription: 'Senior Software Engineer role building reliable backend APIs and partnering closely with product and design teams.',
-  background: 'I am a backend engineer with 3 years of experience in Python, Flask, SQL, and distributed systems.',
-  topics: ['Teamwork', 'Leadership', 'Problem Solving'],
+  jobDescription: 'Senior Strategy Consultant at a Tier-1 firm, spearheading digital transformation initiatives for Fortune 500 clients.',
+  background: 'Accomplished professional with a track record of driving cross-functional growth and optimizing operational efficiencies in high-growth environments.',
+  topics: ['Leadership', 'Problem Solving', 'Communication'],
 }
 
 
@@ -473,16 +473,16 @@ function InterviewPage() {
                   Interview Coach
                 </Typography>
                 <Typography variant="h3" sx={{ fontWeight: 800, lineHeight: 1.1, mt: 1, mb: 2 }}>
-                  Practice with a polished, realistic interview flow.
+                  Master Your Next Career-Defining Interview.
                 </Typography>
                 <Typography color="text.secondary" sx={{ mb: 3 }}>
-                  Start in demo mode using your live Flask routes via `/api`. Voice now supports strict push-to-talk with review before send.
+                  Deploy advanced behavioral simulations powered by fine-tuned AI models. Experience high-fidelity voice interactions and STAR-pattern analytics.
                 </Typography>
                 <Stack spacing={1.5}>
                   {[
-                    'Corporate-grade setup experience',
-                    'Real-time interview transcript',
-                    'Structured feedback-ready session end',
+                    'High-Fidelity Executive Simulation',
+                    'Intelligent Real-Time Transcription',
+                    'Deep Behavioral Analytics & Insights',
                   ].map((line) => (
                     <Stack key={line} direction="row" spacing={1.2} alignItems="center">
                       <CheckCircleRoundedIcon color="secondary" fontSize="small" />
