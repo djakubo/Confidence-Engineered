@@ -15,9 +15,9 @@ from sqlalchemy import text
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
-GOOGLE_CLIENT_ID = "555185131868-mvkio7hhse2ka2m14seida28u4vra5fu.apps.googleusercontent.com"
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "555185131868-mvkio7hhse2ka2m14seida28u4vra5fu.apps.googleusercontent.com")
 
-SECRET_KEY = "change-this-to-a-long-random-secret"
+SECRET_KEY = os.getenv("SECRET_KEY", "change-this-to-a-long-random-secret")
 JWT_ALGORITHM = "HS256"
 
 try:
@@ -30,8 +30,19 @@ app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'app.db')
+db_url = os.getenv('DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'app.db'))
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db_ssl_ca = os.getenv('DB_SSL_CA')
+if db_url.startswith('mysql') and db_ssl_ca:
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'connect_args': {
+            'ssl': {
+                'ca': db_ssl_ca
+            }
+        }
+    }
 
 db = SQLAlchemy(app)
 
@@ -682,10 +693,12 @@ Keep responses concise and professional."""
 
 @app.after_request
 def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
+    frontend_url = os.getenv("FRONTEND_URL", "*")
+    response.headers.add('Access-Control-Allow-Origin', frontend_url)
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Debug')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     return response
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    debug_mode = os.getenv("FLASK_DEBUG", "True").lower() in ("true", "1", "t")
+    app.run(debug=debug_mode)

@@ -7,8 +7,11 @@ async function handleResponse(response) {
   return payload
 }
 
+const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
+const resolvePath = (path) => path.startsWith('http') ? path : `${baseUrl}${path}`
+
 export async function postJson(path, body) {
-  const response = await fetch(path, {
+  const response = await fetch(resolvePath(path), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -21,7 +24,7 @@ export async function postJson(path, body) {
 }
 
 export async function postForm(path, formData) {
-  const response = await fetch(path, {
+  const response = await fetch(resolvePath(path), {
     method: 'POST',
     headers: {
       ...(localStorage.getItem('authToken') ? { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` } : {})
