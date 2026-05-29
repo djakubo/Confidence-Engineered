@@ -67,7 +67,26 @@ def test_start_interview_session_json(client):
 
 def test_analytics_safety(client):
     """Assert empty structure returns cleanly for missing users avoiding 500s."""
-    response = client.get("/api/analytics/9999")
+    # 1. Register a new user
+    client.post("/api/register", json={
+        "email": "analytics@example.com",
+        "password": "password123",
+        "name": "Analytics User",
+        "role": "Candidate"
+    })
+    
+    # 2. Login to get token
+    login_response = client.post("/api/login", json={
+        "email": "analytics@example.com",
+        "password": "password123"
+    })
+    assert login_response.status_code == 200
+    token = login_response.json["access_token"]
+    
+    # 3. Request analytics using Bearer token
+    response = client.get("/api/analytics/me", headers={
+        "Authorization": f"Bearer {token}"
+    })
     assert response.status_code == 200
     assert "sessions" in response.json
     assert "averages" in response.json
