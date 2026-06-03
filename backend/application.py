@@ -699,6 +699,8 @@ def after_request(response):
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     return response
 
+application = app
+
 if __name__ == "__main__":
     debug_mode = os.getenv("FLASK_DEBUG", "True").lower() in ("true", "1", "t")
-    app.run(debug=debug_mode)
+    application.run(debug=debug_mode)
