@@ -1,4 +1,4 @@
-const API_BASE = "/api";
+const API_BASE = "http://confidence-engineered-env.eba-ezmuq6mm.us-east-1.elasticbeanstalk.com/api";
 
 export async function registerUser(email, password, name, role) {
   const response = await fetch(`${API_BASE}/register`, {
