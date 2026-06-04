@@ -26,7 +26,7 @@ except ImportError:
     OpenAI = None
 
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='dist', static_url_path='')
 app.logger.setLevel(logging.INFO)
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -45,6 +45,16 @@ if db_url.startswith('mysql') and db_ssl_ca:
     }
 
 db = SQLAlchemy(app)
+
+from flask import send_from_directory
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_react(path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, 'index.html')
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -212,9 +222,6 @@ def _build_system_prompt(job_description: str, background: str, topics: List[str
     )
 
 
-
-
-
 def _extract_feedback_json(raw_text: str) -> Optional[Dict[str, Any]]:
     try:
         return json.loads(raw_text)
@@ -230,10 +237,7 @@ def _extract_feedback_json(raw_text: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-
-
-
-@app.post("/api/session/start")
+@app.post("/api/session/start", strict_slashes=False)
 def start_session():
     payload = request.get_json(silent=True) or {}
     job_description = (payload.get("job_description") or "").strip()
@@ -291,7 +295,7 @@ def start_session():
     return jsonify(response), 200
 
 
-@app.post("/api/session/respond")
+@app.post("/api/session/respond", strict_slashes=False)
 def respond_session():
     payload = request.get_json(silent=True) if request.is_json else {}
     payload = payload or {}
@@ -344,7 +348,7 @@ def respond_session():
     return jsonify(response), 200
 
 
-@app.post("/api/session/end")
+@app.post("/api/session/end", strict_slashes=False)
 def end_session():
     payload = request.get_json(silent=True) or {}
     session_id = payload.get("session_id")
@@ -404,7 +408,7 @@ def end_session():
     return jsonify(response), 200
 
 
-@app.get("/api/session/debug/<session_id>")
+@app.get("/api/session/debug/<session_id>", strict_slashes=False)
 def debug_session(session_id: str):
     session_row = InterviewSession.query.get(session_id)
     if not session_row:
@@ -423,7 +427,7 @@ def debug_session(session_id: str):
     }), 200
 
 
-@app.post("/api/parse-document")
+@app.post("/api/parse-document", strict_slashes=False)
 def parse_document():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
@@ -458,7 +462,7 @@ def parse_document():
         return jsonify({"error": "Failed to parse document"}), 500
 
 
-@app.post("/api/register")
+@app.post("/api/register", strict_slashes=False)
 def register():
     payload = request.get_json(silent=True) or {}
     email = payload.get("email")
@@ -485,7 +489,7 @@ def register():
     return jsonify({"message": "User registered successfully"}), 201
 
 
-@app.post("/api/login")
+@app.post("/api/login", strict_slashes=False)
 def login():
     payload = request.get_json(silent=True) or {}
     email = payload.get("email")
@@ -504,14 +508,13 @@ def login():
         algorithm=JWT_ALGORITHM
     )
     
-    # In older versions of PyJWT, encode returns bytes. Convert to str if necessary.
     if isinstance(token, bytes):
         token = token.decode("utf-8")
         
     return jsonify({"access_token": token, "user_id": user.id, "message": "Login successful"}), 200
 
 
-@app.post("/api/auth/google")
+@app.post("/api/auth/google", strict_slashes=False)
 def google_auth():
     payload = request.get_json(silent=True) or {}
     credential = payload.get("credential")
@@ -527,7 +530,6 @@ def google_auth():
         
         user = User.query.filter_by(email=email).first()
         if not user:
-            # Auto-register
             user = User(
                 email=email,
                 password_hash="oauth",
@@ -550,7 +552,8 @@ def google_auth():
     except ValueError as e:
         return jsonify({"message": "Invalid Google token"}), 401
 
-@app.get("/api/analytics/me")
+
+@app.get("/api/analytics/me", strict_slashes=False)
 def analytics():
     user_email = get_current_user()
     if not user_email:
@@ -621,7 +624,8 @@ def analytics():
         "sessions": past_sessions
     }), 200
 
-@app.post("/api/user/update")
+
+@app.post("/api/user/update", strict_slashes=False)
 def update_user():
     user_email = get_current_user()
     if not user_email:
@@ -643,7 +647,7 @@ def update_user():
     return jsonify({"message": "Profile updated successfully"}), 200
 
 
-@app.route("/")
+@app.route("/", strict_slashes=False)
 def index():
     return jsonify({"status": "Backend is running!"}), 200
 
@@ -652,7 +656,7 @@ def index():
 def options_routes(path):
     return jsonify({}), 200
 
-@app.post("/api/chatbot/jay")
+@app.post("/api/chatbot/jay", strict_slashes=False)
 def jay_chat():
     user_email = get_current_user()
     if not user_email:

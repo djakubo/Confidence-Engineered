@@ -7,7 +7,7 @@ async function handleResponse(response) {
   return payload
 }
 
-const baseUrl = 'http://confidence-engineered-env.eba-ezmuq6mm.us-east-1.elasticbeanstalk.com'
+const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
 const resolvePath = (path) => path.startsWith('http') ? path : `${baseUrl}${path}`
 
 export async function postJson(path, body) {
