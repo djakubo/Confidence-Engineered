@@ -25,24 +25,7 @@ try:
 except ImportError:
     OpenAI = None
 
-
-app = Flask(__name__, static_folder='dist', static_url_path='')
-app.logger.setLevel(logging.INFO)
-
-basedir = os.path.abspath(os.path.dirname(__file__))
-db_url = os.getenv('DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'app.db'))
-app.config['SQLALCHEMY_DATABASE_URI'] = db_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db_ssl_ca = os.getenv('DB_SSL_CA')
-if db_url.startswith('mysql') and db_ssl_ca:
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'connect_args': {
-            'ssl': {
-                'ca': db_ssl_ca
-            }
-        }
-    }
+app = Flask(__name__)
 
 db = SQLAlchemy(app)
 
