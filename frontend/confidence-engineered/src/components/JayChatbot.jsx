@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { getApiUrl } from "../api/client";
-import {
-  Box, TextField, IconButton, Typography, Paper,
-  Stack, Collapse, Fade, CircularProgress
+import { 
+  Box, TextField, IconButton, Typography, Paper, 
+  Stack, Collapse, Fade, CircularProgress 
 } from '@mui/material';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import SmartToyRoundedIcon from '@mui/icons-material/SmartToyRounded';
@@ -38,7 +37,7 @@ const JayChatbot = ({ dashboardData }) => {
 
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(getApiUrl('/api/chatbot/jay'), {
+      const response = await fetch('/api/chatbot/jay', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -64,24 +63,24 @@ const JayChatbot = ({ dashboardData }) => {
   };
 
   return (
-    <Box sx={{
-      position: 'fixed',
-      bottom: 16,
-      right: 16,
+    <Box sx={{ 
+      position: 'fixed', 
+      bottom: 16, 
+      right: 16, 
       zIndex: 1000,
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'flex-end'
     }}>
       <Fade in={isOpen} unmountOnExit>
-        <Paper
-          elevation={6}
-          sx={{
-            width: 320,
-            height: 400,
-            mb: 2,
-            borderRadius: 4,
-            display: 'flex',
+        <Paper 
+          elevation={6} 
+          sx={{ 
+            width: 320, 
+            height: 400, 
+            mb: 2, 
+            borderRadius: 4, 
+            display: 'flex', 
             flexDirection: 'column',
             overflow: 'hidden',
             border: '1px solid',
@@ -104,11 +103,11 @@ const JayChatbot = ({ dashboardData }) => {
           <Box ref={scrollRef} sx={{ flex: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             {messages.map((m, i) => (
               <Box key={i} sx={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 1.5,
-                    borderRadius: 3,
+                <Paper 
+                  elevation={0} 
+                  sx={{ 
+                    p: 1.5, 
+                    borderRadius: 3, 
                     bgcolor: m.role === 'user' ? 'primary.main' : 'action.hover',
                     color: m.role === 'user' ? 'white' : 'text.primary',
                   }}
@@ -148,13 +147,13 @@ const JayChatbot = ({ dashboardData }) => {
       </Fade>
 
       {/* Floating Toggle Button */}
-      <IconButton
+      <IconButton 
         onClick={() => setIsOpen(!isOpen)}
-        sx={{
-          width: 56,
-          height: 56,
-          bgcolor: 'primary.main',
-          color: 'white',
+        sx={{ 
+          width: 56, 
+          height: 56, 
+          bgcolor: 'primary.main', 
+          color: 'white', 
           boxShadow: 4,
           '&:hover': { bgcolor: 'primary.dark', transform: 'scale(1.05)' },
           transition: '0.2s'

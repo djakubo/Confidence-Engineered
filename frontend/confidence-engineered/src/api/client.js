@@ -9,7 +9,6 @@ async function handleResponse(response) {
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
 const resolvePath = (path) => path.startsWith('http') ? path : `${baseUrl}${path}`
-export const getApiUrl = resolvePath
 
 export async function postJson(path, body) {
   const response = await fetch(resolvePath(path), {

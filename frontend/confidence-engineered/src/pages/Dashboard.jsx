@@ -21,7 +21,6 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import { useThemeContext } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import JayChatbot from '../components/JayChatbot';
-import { getApiUrl } from '../api/client';
 
 const MotionPaper = motion.create(Paper);
 const MotionCard = motion.create(Card);
@@ -58,7 +57,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!token) return;
-    fetch(getApiUrl(`/api/analytics/me`), {
+    fetch(`/api/analytics/me`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => {
@@ -116,7 +115,7 @@ export default function Dashboard() {
       try {
         const formData = new FormData();
         formData.append('file', file);
-        const res = await fetch(getApiUrl('/api/parse-document'), {
+        const res = await fetch('/api/parse-document', {
           method: 'POST',
           headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
           body: formData
@@ -159,7 +158,7 @@ export default function Dashboard() {
     setAvatarRole(role);
     if (!token) return;
     try {
-      await fetch(getApiUrl('/api/user/update'), {
+      await fetch('/api/user/update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -456,9 +455,9 @@ export default function Dashboard() {
                                   sx={{ cursor: 'pointer', fontWeight: 'bold' }}
                                 />
                               </Stack>
-                              <IconButton
-                                size="small"
-                                color="error"
+                              <IconButton 
+                                size="small" 
+                                color="error" 
                                 onClick={() => removeDoc(doc.id)}
                                 sx={{ mt: -0.5, mr: -0.5, opacity: 0.7, '&:hover': { opacity: 1 } }}
                               >
@@ -484,12 +483,12 @@ export default function Dashboard() {
           </Grid>
         </motion.div>
       </Container>
-      <JayChatbot
-        dashboardData={{
-          sessions: sessionsData,
-          analytics: analyticsData,
-          user: { name: userName, role: userRole }
-        }}
+      <JayChatbot 
+        dashboardData={{ 
+          sessions: sessionsData, 
+          analytics: analyticsData, 
+          user: { name: userName, role: userRole } 
+        }} 
       />
     </Box>
   );

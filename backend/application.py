@@ -27,6 +27,19 @@ except ImportError:
 
 app = Flask(__name__)
 
+# Read DATABASE_URL from environment (RDS in production, SQLite fallback locally)
+_default_db = 'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', _default_db)
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# RDS SSL support
+_db_url = app.config['SQLALCHEMY_DATABASE_URI']
+_ssl_ca = os.getenv('DB_SSL_CA')
+if _db_url.startswith('mysql') and _ssl_ca:
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'connect_args': {'ssl': {'ca': _ssl_ca}}
+    }
+
 db = SQLAlchemy(app)
 
 from flask import send_from_directory
@@ -34,6 +47,10 @@ from flask import send_from_directory
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_react(path):
+    # Never let the React catch-all swallow API routes
+    if path.startswith('api/'):
+        from flask import abort
+        abort(404)
     if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
         return send_from_directory(app.static_folder, path)
     else:
@@ -637,7 +654,12 @@ def index():
 @app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
 @app.route('/<path:path>', methods=['OPTIONS'])
 def options_routes(path):
-    return jsonify({}), 200
+    response = jsonify({})
+    frontend_url = os.getenv("FRONTEND_URL", "*")
+    response.headers.add('Access-Control-Allow-Origin', frontend_url)
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Debug')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response, 200
 
 @app.post("/api/chatbot/jay", strict_slashes=False)
 def jay_chat():
